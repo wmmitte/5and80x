@@ -8,7 +8,7 @@ rem git push -u origin master
 
 rem ====  …or push an existing repository from the command line
 
-git remote add origin https://github.com/wmmitte/mu533.git
+git remote add origin https://github.com/wmmitte/5and80x.git
 git push -u origin master
 
 rem …or import code from another repository
