@@ -36,7 +36,7 @@ router.get("/", (req, res, next) => {
         .then(datas => {
             const response = {
                 nombre: datas.length,
-                Lieux: datas.map(data => {
+                lieux: datas.map(data => {
                     return {
                         _id: data._id,
                         libelle: data.libelle,

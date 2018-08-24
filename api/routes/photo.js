@@ -62,12 +62,14 @@ const storage = new GridFsStorage({
 //Une fois sur cette route on enregistre le fichier
 //et on peut recuperer les infos relatives a celui ci
 //pour enregistrer dans la collections photo
-  router.post("/test", upload.single('file'),(req, res) => {
+  router.post("/test",upload.single('file'),(req, res) => {
     //res.json({file:req.file,body:req.body});
     const foto= new Photo({
         _id: new mongoose.Types.ObjectId(),
         objet: req.body.objet ,
+        description: req.body.description,
         filename: req.file.filename,
+        originalname: req.file.originalname,
         uploadDate: req.file.uploadDate,
         contentType: req.file.contentType
     });
@@ -132,6 +134,8 @@ router.post("/", upload.single('file'), (req, res, next) => {
     const foto= new Photo({
         _id: new mongoose.Types.ObjectId(),
         objet: req.body.objet ,
+        description: req.body.description,
+        originalname: req.file.originalname,
         filename: req.file.filename,
         uploadDate: req.file.uploadDate,
         contentType: req.file.contentType
@@ -200,7 +204,7 @@ router.get("/:phoName", (req, res, next) => {
         });
 });
 
-//tester l'affichage d'une Image dont on connait le nom
+//tester l'affichage d'une Photo dont on connait le nom
 //Stocké dans la bd ( dans collection photo simple) 
 
 router.get("/image/:phoName", (req, res, next) => {
@@ -236,130 +240,35 @@ router.get("/image/:phoName", (req, res, next) => {
 
 
 
-/** NON NECESSAIRE
- *
- * Mise à jour Photo
- * dans la base de données
- * dont on connait l'identifiant
- * PATCH
- * url : /:_Id
- */
-/*
-router.put("/:phoId", upload.single('file'), (req, res, next) => {
-    //recuperation de l'identifiant 
-    const id = req.params.phoId;
-
-    //recuperation des attributs ayant ete modifies 
-    //const updateProperties = req.file;
-    const updateProperties= {
-        filename: req.file.filename,
-        uploadDate: req.file.uploadDate,
-        contentType: req.file.contentType,
-        objet: req.body.objet
-    } ;
-
-    //Execution de la requete
-    Photo.findByIdAndUpdate(id, updateProperties,{new:true})
-        .exec()
-        .then((data) => {
-            const response = {
-                message: "Photo  modifiée avec succès",
-                photo: data,
-                request: {
-                    type: "GET",
-                    url: `${_CONFIGS.serverAdress}${_CONFIGS.applicationEndpoint}/photos/${data._id}`
-                }
-            };
-            res
-                .status(200)
-                .json(response);
-        })
-        .catch(err => {
-            console.log(err);
-            res.status(500).json({
-                error: err
-            });
-        });
-});
-*/
-
-/** NON NECESSAIRE
- *
- * suppression Photo
- * dans la base de données
- * dont on connait l'identifiant
- * DELETE
- * url : /:_Id
- */
-router.delete("/:tecId", (req, res, next) => {
-    /*recuperation de l'identifiant */
-    const id = req.params.tecId;
-
-    /*Execution de la requete*/
-    Photo.findByIdAndRemove(id)
-        .exec()
-        .then((data) => {
-            const response = {
-                photo: {_id:id},
-                message: "Photo supprimée avec succès",
-            };
-            res
-                .status(200)
-                .json(response);
-        })
-        .catch(err => {
-            console.log(err);
-            res.status(500).json({
-                error: err
-            });
-        });
-});
-
 
 /**
  *
- * Recherches Photo
+ * suppression Photo
  * dans la base de données
- * dont on connait un mot cle
- * GET
+ * dont on connait le nom
+ * DELETE
  * url : /:_Id
  */
-/*
-router.get("/search/:keyword", (req, res, next) => {
+router.delete("/:phoName", (req, res, next) => {
+    /*recuperation de l'identifiant */
+    const fname = req.params.phoName;
 
-    //recuperation du mot cley pour la recherche
-    const keyword = req.params.keyword;
+    /*Execution de la requete*/
+    
+    gfs.remove({filename:fname, root:'Photo'}, (err, gridStore)=>{
+        if(err){
+            return res.status(404).json({err:err});
+        }
+        const response = {
+            image: fname,
+            message: "photo supprimée avec succès",
+        };
+        res
+            .status(200)
+            .json(response);
+    })
+});
 
-    //Execution de la requete de recherche dans la base de données
-    Photo.find({$or:[
-         //{libelle:{ $regex: keyword, $options: '/ix'}},
-       //  {categorie.libelle :{ $regex: keyword, $options: '/ix'}}
-         ]})
-        .populate('objet')
-        .sort([['_id',-1]])
-        .exec()
-        .then(datas => {
-            // console.log(datas);
-            if (datas && datas.length !==0) { //Il y a une correspondance à la recherche
-                const response = {
-                    photos: datas
-                };
-                res
-                    .status(200)
-                    .json(response);
-            } else { // Pas de correspondance après la recherche dasn la BD
-                res
-                    .status(404)
-                    .json({message: "Aucun élément valide correspondant à cet identifiant"});
-            }
-        })
-        .catch(err => { // en cas d'erreur
-            console.log(err);
-            res.status(500).json({
-                error: err
-            });
-        });
-}); */
 
 
 module.exports = router;

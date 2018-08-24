@@ -11,16 +11,6 @@
  */
 
 const mongoose = require('mongoose');
-const ModeAcquisition = require("./modeAcquisition");
-const Collectionn = require("./collectionn");
-const Utilisateur = require("./utilisateur");
-const EtatConservation= require('./etatConservation');
-const Fabricant= require('./fabricant');
-const LieuFabrication= require('./lieuFabrication');
-const Collecteur = require('./collecteur');
-const Emplacement= require('./emplacement');
-const LieuAcquisition = require('./lieuAcquisition');
-const Categorie = require("./categorie");
 
 
 const schema = mongoose.Schema({
@@ -120,12 +110,14 @@ const schema = mongoose.Schema({
 
     photoref: { type: String , required: true }, // voir possiblité denvoyer vers photo
 
+    photooriginalname : { type: String , required: true },
+
+    photodescription : { type: String , required: true },
+
     dateCreation: { type: Date , required: false },
 
     datMaj: { type: Date , required: false },
 
-
-    
 });
 
 module.exports = mongoose.model('Objet', schema);

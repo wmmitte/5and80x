@@ -24,10 +24,16 @@ const schema = mongoose.Schema({
 
     filename : { type: String, required: false }, // à completer avec Gridfs
 
-    uploadDate : { type: Date, required: false },
+    originalname : { type: String, required: false },
 
-    contentType: { type: String, required: false }
+    uploadDate : { type: Date, required: true },
+
+    contentType: { type: String, required: true },
+
+    description: { type: String, required: true }
     
+    
+    // imageId: { type: String, require: true } //=> Envisager pour la suppression dans les deux tables
 });
 
 module.exports = mongoose.model('Photo', schema);

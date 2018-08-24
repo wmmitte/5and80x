@@ -14,6 +14,49 @@ const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
 const Objet = require("../models/objet");
+const path = require('path');
+const crypto = require('crypto');
+const multer = require('multer');
+const GridFsStorage = require('multer-gridfs-storage');
+const Grid = require('gridfs-stream');
+
+
+//create mongo connection
+const mongoURI=_CONFIGS.databaseSourceName;
+const conn=mongoose.createConnection(mongoURI,{ useNewUrlParser: true });
+
+//init gfs
+let gfs;
+
+conn.once('open',() => {
+   // console.log('bd ouverte');
+   //init stream*
+
+   gfs=Grid(conn.db,mongoose.mongo);
+   gfs.collection('Objet');
+})
+
+const storage = new GridFsStorage({
+    url: mongoURI,
+    file: (req, file) => {
+       
+      return new Promise((resolve, reject) => { 
+        crypto.randomBytes(16, (err, buf) => {
+          if (err) {
+            return reject(err);
+          }
+          const filename = buf.toString('hex') + path.extname(file.originalname);
+         // const id = 'Id';
+          const fileInfo = {
+            filename: filename,
+            bucketName: 'Objet'
+          };
+          resolve(fileInfo);
+        });
+      });
+    }
+  });
+  const upload = multer({ storage });
 
 /**
  *
@@ -60,7 +103,7 @@ router.get("/", (req, res, next) => {
  * POST
  * url : /
  */
-router.post("/", (req, res, next) => {
+router.post("/",upload.single('file'), (req, res, next) => {
 
     /* Preparation/construction de l'objet */
     const objet = new Objet({
@@ -74,6 +117,7 @@ router.post("/", (req, res, next) => {
 
         description: req.body.description,
         //image: 'default.jpg',
+
         infosComplementaire:req.body.infosComplementaire ,
 
         appelationLocale: req.body.appelationLocale ,
@@ -98,7 +142,11 @@ router.post("/", (req, res, next) => {
 
         datation:  Date.now(), // req.body.datation,
 
-        photoref: req.body.photoref, // voir possiblité denvoyer vers photo
+        photoref: req.file.filename, // voir possiblité denvoyer vers photo
+
+        photooriginalname: req.file.originalname,
+
+        photodescription:req.body.photodescription,
 
         dateCreation: Date.now(), //req.body.dateCreation,
 
@@ -215,6 +263,40 @@ router.get("/:objetId", (req, res, next) => {
 });
 
 
+//tester l'affichage d'une Image dont on connait le nom
+//Stocké dans la bd ( dans collection photo simple) 
+
+router.get("/photoref/:photooriginalname", (req, res, next) => {
+
+    /*recuperation de l'identifiant */
+    const nom = req.params.photooriginalname;
+
+    /*Execution de la requete de recherche dans la base de données*/
+    //Photo.findById(id)
+    Objet.findOne({photooriginalname:nom})
+        .exec()
+        .then(data => {
+            if (data) { /*Il y a une correspondance à la recherche*/
+               
+                const readStream= gfs.createReadStream(data.photoref);
+                readStream.pipe(res);
+            // On pourra donc afficher limage dans la vue en lui envoyant data
+               
+            } else { /* Pas de correspondance après la recherche dasn la BD */
+                res
+                    .status(404)
+                    .json({message: "Aucun élément valide correspondant à cet identifiant"});
+            }
+        })
+        .catch(err => { // en cas d'erreur
+            console.log(err);
+            res.status(500).json({
+                error: err
+            });
+        });
+});
+
+
 /**
  *
  * Mise à d'un objet
@@ -224,11 +306,80 @@ router.get("/:objetId", (req, res, next) => {
  * url : /:_Id
  */
 router.put("/:objetId", (req, res, next) => {
+
     /*recuperation de l'identifiant de l'objet*/
     const id = req.params.objetId;
 
+    /*
+    const updateProperties= {
+        
+        numeroInventaire: req.body.numeroInventaire,
+
+        ancienNumeroInventaire: req.body.ancienNumeroInventaire,
+
+        nom: req.body.nom,
+
+        description: req.body.description,
+        
+        infosComplementaire:req.body.infosComplementaire ,
+
+        appelationLocale: req.body.appelationLocale ,
+
+        dateAcquisition: Date.now(), // req.body.dateAcquisition,
+
+        hauteur: req.body.hauteur,
+
+        profondeur: req.body.profondeur,
+
+        longueur: req.body.longueur,
+
+        circonference: req.body.circonference,
+
+        largeur: req.body.largeur,
+
+        diametre: req.body.diametre,
+
+        epaisseur: req.body.epaisseur,
+
+        poids: req.body.poids,
+
+        datation:  Date.now(), // req.body.datation,
+
+      //  photoref: req.file.filename, // voir possiblité denvoyer vers photo
+
+       // photooriginalname: req.file.originalname,
+
+     //   photodescription:req.body.photodescription,
+
+        dateCreation: Date.now(), //req.body.dateCreation,
+
+        datMaj: Date.now(), //req.body.datMaj,
+
+        lieuAcquisition : req.body.lieuAcquisition ,
+    
+        emplacement : req.body.emplacement ,
+    
+        collecteur : req.body.collecteur ,
+
+        categorie : req.body.categorie ,
+    
+        lieuFabrication : req.body.lieuFabrication ,
+    
+        fabricant : req.body.fabricant ,
+    
+        etatConservation : req.body.etatConservation ,
+    
+        modeAcquisition :req.body.modeAcquisition ,
+    
+        collectionn : req.body.collectionn ,
+    
+        utilisateur : req.body.utilisateur 
+    };
+*/
+
+
     /*recuperation des attributs ayant ete modifies de l'objet*/
-    const updateProperties = req.body;
+   const updateProperties = req.body;
 
     /*Execution de la requete*/
     Objet.findByIdAndUpdate(id, updateProperties,{new:true})
@@ -266,24 +417,40 @@ router.put("/:objetId", (req, res, next) => {
 router.delete("/:objetId", (req, res, next) => {
     /*recuperation de l'identifiant de l'objet*/
     const id = req.params.objetId;
-
-    /*Execution de la requete*/
-    Objet.findByIdAndRemove(id)
+ /*Execution de la requete*/
+    Objet.findById(id)
         .exec()
-        .then((data) => {
-            const response = {
-                message: "Objet supprimé avec succès",
-            };
-            res
-                .status(200)
-                .json(response);
-        })
-        .catch(err => {
-            console.log(err);
-            res.status(500).json({
-                error: err
-            });
+        .then(data => {
+            if (data.photoref) { /*Il y a une image de reference à la recherche*/
+                //suppression de l'image de reference
+                    filename= data.photoref;
+                    gfs.remove({filename:filename, root:'Objet'}, (err, gridStore)=>{
+                        if(err){
+                            return res.status(404).json({err:err});
+                        } 
+                    }) ;
+            }
+            
+            //suppression de l'objet
+            Objet.findByIdAndRemove(id)
+                .exec()
+                .then((data) => {
+                 const response = {
+                    objet: {_id:id},
+                    message: "Objet supprimé avec succès",
+                 };
+                  res.status(200).json(response);
+             })
+                .catch(err => {
+                    console.log(err);
+                   res.status(500).json({
+                      error: err
+                 });
+                });
+            
+
         });
+ 
 });
 
 
@@ -339,6 +506,134 @@ router.get("/search/:keyword", (req, res, next) => {
             });
         });
 });
+
+/**
+ *
+ * Ajouter/modifier la photo de refence
+ * d'un objet 
+ * dont on connait son id
+ * put
+ * url : /:_Id
+ */
+
+router.put("/addref/:objetId",upload.single('file'), (req, res, next) => {
+
+    /*recuperation de l'identifiant */
+    const id = req.params.objetId;
+
+    /*recuperation des attributs ayant ete modifies */
+    const updateProperties = {
+
+        photoref: req.file.filename, 
+
+        photooriginalname: req.file.originalname,
+
+        photodescription:req.body.photodescription
+    } ;
+
+    Objet.findById(id)
+        .exec()
+        .then(data => {
+            if (data.photoref) { /*Il y a une image de reference à la recherche*/
+                //suppression de l'image de reference
+                    const filename= data.photoref;
+                    gfs.remove({filename:filename, root:'Objet'}, (err, gridStore)=>{
+                        if(err){
+                            return res.status(404).json({err:err});
+                        } 
+                    }) ;
+            }
+
+            
+            //ajoute des nouvelles informations
+            Objet.findByIdAndUpdate(id, updateProperties,{new:true})
+                .exec()
+                .then((data) => {
+                const response = {
+                    message: "photoreference  modifiée avec succès",
+                    reference: data
+                    
+             };
+                res.status(200).json(response);
+            })
+            .catch(err => {
+                console.log(err);
+                res.status(500).json({
+                    error: err
+                });
+            });
+
+            
+
+        });
+
+});
+
+
+
+
+
+
+/**
+ *
+ * supprimer la photo de refence
+ * d'un objet 
+ * dont on connait son id
+ * put
+ * url : /:_Id
+ */
+router.delete("/rmref/:objetId", (req, res, next) => {
+
+     /*recuperation de l'identifiant */
+     const id = req.params.objetId;
+
+     /*recuperation des attributs ayant ete modifies */
+     const updateProperties = {
+ 
+         photoref: "", 
+ 
+         photooriginalname: "" ,
+ 
+         photodescription: "" 
+     } ;
+ 
+     Objet.findById(id)
+         .exec()
+         .then(data => {
+             if (data.photoref) { /*Il y a une image de reference à la recherche*/
+                 //suppression de l'image de reference
+                     const filename= data.photoref;
+                     gfs.remove({filename:filename, root:'Objet'}, (err, gridStore)=>{
+                         if(err){
+                             return res.status(404).json({err:err});
+                         } 
+                     }) ;
+             }
+ 
+             
+             //ajoute des nouvelles informations
+             Objet.findByIdAndUpdate(id, updateProperties,{new:true})
+                 .exec()
+                 .then((data) => {
+                 const response = {
+                     message: "photoreference  supprimée avec succès",
+                     referen: data
+                     
+              };
+                 res.status(200).json(response);
+             })
+             .catch(err => {
+                 console.log(err);
+                 res.status(500).json({
+                     error: err
+                 });
+             });
+ 
+             
+ 
+         });
+});
+
 
 
 module.exports = router;
